@@ -1,6 +1,12 @@
 using JobTracker.Web.Components;
+using JobTracker.Data.Data;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Add EF Core with PostgreSQL
+builder.Services.AddDbContext<JobTrackerDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
