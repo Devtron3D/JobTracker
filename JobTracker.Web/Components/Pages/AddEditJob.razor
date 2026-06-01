@@ -1,0 +1,132 @@
+﻿@page "/jobs/add"
+@page "/jobs/edit/{Id:int}"
+@rendermode InteractiveServer
+@using JobTracker.Core.Interfaces
+@using JobTracker.Core.Models
+@inject IJobApplicationService JobService
+@inject ICvProfileService CvService
+@inject NavigationManager Nav
+
+<PageTitle>@(IsEdit ? "Edit Job" : "Log a Job") | Job Tracker</PageTitle>
+
+<div class="page-header">
+    <h1>@(IsEdit ? "Edit Application" : "Log a Job Application")</h1>
+    <a href="/" class="btn">← Back</a>
+</div>
+
+<div class="form-card">
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert-error">@errorMessage</div>
+    }
+
+    <div class="form-group">
+        <label>Job Title *</label>
+        <input class="form-input" @bind="model.Title" placeholder="e.g. C++ Developer" />
+    </div>
+
+    <div class="form-group">
+        <label>Company *</label>
+        <input class="form-input" @bind="model.Company" placeholder="e.g. Acme Corp" />
+    </div>
+
+    <div class="form-group">
+        <label>Category *</label>
+        <input class="form-input" @bind="model.Category"
+               placeholder="e.g. C++, Embedded, C#, Truck Driver" />
+    </div>
+
+    <div class="form-group">
+        <label>Status</label>
+        <select class="form-select" @bind="model.Status">
+            <option value="Applied">Applied</option>
+            <option value="Interview">Interview</option>
+            <option value="Rejected">Rejected</option>
+            <option value="Offer">Offer</option>
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label>CV Used</label>
+        <select class="form-select" @bind="selectedCvId">
+            <option value="">-- Select a CV --</option>
+            @foreach (var cv in cvProfiles)
+            {
+                <option value="@cv.Id">@cv.Name</option>
+            }
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label>Job URL</label>
+        <input class="form-input" @bind="model.JobUrl"
+               placeholder="https://..." />
+    </div>
+
+    <div class="form-group">
+        <label>Date Applied</label>
+        <input class="form-input" type="date"
+               @bind="model.DateApplied" />
+    </div>
+
+    <div class="form-group">
+        <label>Notes</label>
+        <textarea class="form-input form-textarea" @bind="model.Notes"
+                  placeholder="Any notes about this application..."></textarea>
+    </div>
+
+    <div class="form-actions">
+        <button class="btn btn-primary" @onclick="Save">
+            @(IsEdit ? "Save Changes" : "Log Application")
+        </button>
+        <a href="/" class="btn">Cancel</a>
+    </div>
+</div>
+
+@code {
+    [Parameter] public int? Id { get; set; }
+
+    private JobApplication model = new();
+    private List<CvProfile> cvProfiles = new();
+    private string selectedCvId = "";
+    private string errorMessage = "";
+    private bool IsEdit => Id.HasValue;
+
+    protected override async Task OnInitializedAsync()
+    {
+        cvProfiles = await CvService.GetAllAsync();
+
+        if (IsEdit)
+        {
+            var existing = await JobService.GetByIdAsync(Id!.Value);
+            if (existing != null)
+            {
+                model = existing;
+                selectedCvId = existing.CvProfileId?.ToString() ?? "";
+            }
+        }
+    }
+
+    private async Task Save()
+    {
+        // Validation
+        if (string.IsNullOrWhiteSpace(model.Title))
+        { errorMessage = "Job title is required."; return; }
+
+        if (string.IsNullOrWhiteSpace(model.Company))
+        { errorMessage = "Company is required."; return; }
+
+        if (string.IsNullOrWhiteSpace(model.Category))
+        { errorMessage = "Category is required."; return; }
+
+        // Link CV
+        model.CvProfileId = int.TryParse(selectedCvId, out var cvId) ? cvId : null;
+
+        if (IsEdit)
+            await JobService.UpdateAsync(model);
+        else
+            await JobService.CreateAsync(model);
+
+        Nav.NavigateTo("/");
+    }
+}

@@ -1,0 +1,116 @@
+﻿@page "/cvs"
+@rendermode InteractiveServer
+@using JobTracker.Core.Interfaces
+@using JobTracker.Core.Models
+@inject ICvProfileService CvService
+
+<PageTitle>CV Profiles | Job Tracker</PageTitle>
+
+<div class="page-header">
+    <h1>CV Profiles</h1>
+</div>
+
+<div class="cv-layout">
+    <!-- Add new CV form -->
+    <div class="form-card">
+        <h2 style="margin-bottom: 1.25rem; font-size: 1.1rem;">Add a CV Profile</h2>
+
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="alert-error">@errorMessage</div>
+        }
+
+        <div class="form-group">
+            <label>Name *</label>
+            <input class="form-input" @bind="newCv.Name"
+                   placeholder="e.g. C# Backend CV, Embedded Systems CV" />
+        </div>
+
+        <div class="form-group">
+            <label>File Name *</label>
+            <input class="form-input" @bind="newCv.FileName"
+                   placeholder="e.g. cv_csharp_2026.pdf" />
+        </div>
+
+        <div class="form-group">
+            <label>Description</label>
+            <input class="form-input" @bind="newCv.Description"
+                   placeholder="What kind of jobs is this CV for?" />
+        </div>
+
+        <div class="form-actions">
+            <button class="btn btn-primary" @onclick="AddCv">Add CV Profile</button>
+        </div>
+    </div>
+
+    <!-- Existing CVs -->
+    <div>
+        <h2 style="margin-bottom: 1rem; font-size: 1.1rem;">Your CV Profiles</h2>
+
+        @if (cvProfiles.Count == 0)
+        {
+            <div class="empty-state">
+                <p>No CV profiles yet. Add one to get started.</p>
+            </div>
+        }
+        else
+        {
+            @foreach (var cv in cvProfiles)
+            {
+                <div class="cv-card">
+                    <div class="cv-card-info">
+                        <span class="cv-card-name">@cv.Name</span>
+                        <span class="cv-card-file">📄 @cv.FileName</span>
+                        @if (!string.IsNullOrEmpty(cv.Description))
+                        {
+                            <span class="cv-card-desc">@cv.Description</span>
+                        }
+                        <span class="cv-card-date">
+                            Added @cv.CreatedAt.ToString("dd/MM/yyyy")
+                        </span>
+                    </div>
+                    <button class="btn btn-small btn-danger"
+                            @onclick="() => DeleteCv(cv.Id)">
+                        Delete
+                    </button>
+                </div>
+            }
+        }
+    </div>
+</div>
+
+@code {
+    private List<CvProfile> cvProfiles = new();
+    private CvProfile newCv = new();
+    private string errorMessage = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCvs();
+    }
+
+    private async Task LoadCvs()
+    {
+        cvProfiles = await CvService.GetAllAsync();
+    }
+
+    private async Task AddCv()
+    {
+        if (string.IsNullOrWhiteSpace(newCv.Name))
+        { errorMessage = "Name is required."; return; }
+
+        if (string.IsNullOrWhiteSpace(newCv.FileName))
+        { errorMessage = "File name is required."; return; }
+
+        errorMessage = "";
+        await CvService.CreateAsync(newCv);
+        newCv = new CvProfile();
+        await LoadCvs();
+    }
+
+    private async Task DeleteCv(int id)
+    {
+        await CvService.DeleteAsync(id);
+        await LoadCvs();
+    }
+}

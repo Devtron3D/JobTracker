@@ -1,7 +1,138 @@
 ﻿@page "/"
+@rendermode InteractiveServer
+@using JobTracker.Core.Interfaces
+@using JobTracker.Core.Models
+@inject IJobApplicationService JobService
+@inject ICvProfileService CvService
 
-<PageTitle>Home</PageTitle>
+<PageTitle>Dashboard | Job Tracker</PageTitle>
 
-<h1>Hello, world!</h1>
+<div class="page-header">
+    <h1>Job Applications</h1>
+    <a href="/jobs/add" class="btn btn-primary">+ Log a Job</a>
+</div>
 
-Welcome to your new app.
+<!-- Search and filters -->
+<div class="filter-bar">
+    <input class="form-input"
+           placeholder="Search by title or company..."
+           @bind="searchTerm"
+           @bind:event="oninput"
+           @onkeyup="LoadJobs" />
+
+    <select class="form-select" @bind="selectedCategory" @bind:after="LoadJobs">
+        <option value="">All Categories</option>
+        @foreach (var cat in categories)
+        {
+            <option value="@cat">@cat</option>
+        }
+    </select>
+
+    <select class="form-select" @bind="selectedStatus" @bind:after="LoadJobs">
+        <option value="">All Statuses</option>
+        <option value="Applied">Applied</option>
+        <option value="Interview">Interview</option>
+        <option value="Rejected">Rejected</option>
+        <option value="Offer">Offer</option>
+    </select>
+
+    <select class="form-select" @bind="selectedCvId" @bind:after="LoadJobs">
+        <option value="">All CVs</option>
+        @foreach (var cv in cvProfiles)
+        {
+            <option value="@cv.Id">@cv.Name</option>
+        }
+    </select>
+</div>
+
+<!-- Results -->
+@if (isLoading)
+{
+    <p class="loading">Loading...</p>
+}
+else if (jobs.Count == 0)
+{
+    <div class="empty-state">
+        <p>No job applications found.</p>
+        <a href="/jobs/add" class="btn btn-primary">Log your first job</a>
+    </div>
+}
+else
+{
+    <div class="jobs-table-wrapper">
+        <table class="jobs-table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Title</th>
+                    <th>Company</th>
+                    <th>Category</th>
+                    <th>Status</th>
+                    <th>CV Used</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var job in jobs)
+                {
+                    <tr>
+                        <td>@job.DateApplied.ToString("dd/MM/yyyy")</td>
+                        <td>
+                            @if (!string.IsNullOrEmpty(job.JobUrl))
+                            {
+                                <a href="@job.JobUrl" target="_blank">@job.Title</a>
+                            }
+                            else
+                            {
+                                @job.Title
+                            }
+                        </td>
+                        <td>@job.Company</td>
+                        <td><span class="badge">@job.Category</span></td>
+                        <td><span class="badge badge-@job.Status.ToLower()">@job.Status</span></td>
+                        <td>@(job.CvProfile?.Name ?? "-")</td>
+                        <td>
+                            <a href="/jobs/edit/@job.Id" class="btn btn-small">Edit</a>
+                            <button class="btn btn-small btn-danger"
+                                    @onclick="() => DeleteJob(job.Id)">
+                                Delete
+                            </button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private List<JobApplication> jobs = new();
+    private List<CvProfile> cvProfiles = new();
+    private List<string> categories = new();
+    private string searchTerm = "";
+    private string selectedCategory = "";
+    private string selectedStatus = "";
+    private string selectedCvId = "";
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        cvProfiles = await CvService.GetAllAsync();
+        categories = await JobService.GetCategoriesAsync();
+        await LoadJobs();
+    }
+
+    private async Task LoadJobs()
+    {
+        isLoading = true;
+        int? cvId = int.TryParse(selectedCvId, out var id) ? id : null;
+        jobs = await JobService.GetAllAsync(searchTerm, selectedCategory, selectedStatus, cvId);
+        isLoading = false;
+    }
+
+    private async Task DeleteJob(int id)
+    {
+        await JobService.DeleteAsync(id);
+        await LoadJobs();
+    }
+}
